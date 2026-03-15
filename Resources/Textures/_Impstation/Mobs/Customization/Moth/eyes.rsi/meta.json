@@ -14,6 +14,10 @@
         {
             "name": "bigger",
             "directions": 4
+        },
+        {
+            "name": "mothperson",
+            "directions": 4
         }
     ]
 }

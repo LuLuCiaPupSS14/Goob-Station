@@ -82,6 +82,12 @@ marking-HeterochromiaMoth-heterochromia = Heterochromia
 marking-MothBiggerEyes = Eyes (Large)
 marking-MothBiggerEyes-bigger = Bigger Eyes
 
+marking-RosieEyesLarge = Rosie eyes large
+marking-RosieEyesLarge-bigger = Rosie eyes large
+
+marking-RosieEyesNormal = Rosie eyes normal
+marking-RosieEyesNormal-mothperson = Rosie eyes normal
+
 # RArm
 
 marking-ProstheticArmRightMoth = Prosthetic (Right Arm)

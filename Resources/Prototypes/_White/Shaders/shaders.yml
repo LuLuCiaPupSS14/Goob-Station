@@ -33,3 +33,14 @@
     colorJitter: 0.8
     alphaJitter: 1
     hue: 0.48
+
+- type: shader
+  id: MothEyesFlicker
+  kind: source
+  path: "/Textures/_Impstation/Shaders/moth_eyes_flicker.swsl"
+  params:
+    minInterval: 60
+    maxInterval: 120
+    transitionSeconds: 12
+    colorStrength: 1
+    alphaJitter: 0.02

@@ -1,0 +1,97 @@
+// Palette-driven moth eye shader.
+// Randomly holds one color for 60-120s, then smoothly transitions to the next.
+
+uniform highp float minInterval;
+uniform highp float maxInterval;
+uniform highp float transitionSeconds;
+uniform highp float colorStrength;
+uniform highp float alphaJitter;
+
+highp float hash(highp vec2 p)
+{
+    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+}
+
+highp float intervalForSegment(highp float segment)
+{
+    return mix(minInterval, maxInterval, hash(vec2(segment, 53.71)));
+}
+
+highp vec3 palette(highp int idx)
+{
+    if (idx == 0) return vec3(1.0, 0.0, 0.0); // Red
+    if (idx == 1) return vec3(0.0, 1.0, 0.0); // Green
+    if (idx == 2) return vec3(0.0, 0.3, 1.0); // Blue
+    if (idx == 3) return vec3(1.0, 1.0, 0.0); // Yellow
+    if (idx == 4) return vec3(0.65, 0.15, 1.0); // Purple
+    return vec3(1.0, 0.2, 0.75); // Pink
+}
+
+highp int pickColor(highp float segment, highp float cycleIndex)
+{
+    // Including cycleIndex in the seed means each ~40-min cycle produces a different sequence.
+    return int(floor(hash(vec2(segment + cycleIndex * 37.3, 19.17)) * 6.0));
+}
+
+void fragment()
+{
+    highp vec4 tex = zTexture(UV);
+
+    // Bounded random timeline: preserves long random holds and smooth shifts,
+    // but avoids unbounded per-pixel work as uptime grows.
+    //
+    // OPT-A: cycleSegments reduced from 96 -> 32. 32 * avg(60,120)s = ~2400s cycle,
+    //        longer than any round. Revert to 96 if colors feel too repetitive.
+    // OPT-B: cycleDuration approximated as constant instead of summing 96 hash calls.
+    //        Uses average interval * segment count. Revert to the loop below if wrapping
+    //        ever looks wrong (cycle jump at wrap point):
+    //            highp float cycleDuration = 0.0;
+    //            for (int i = 0; i < cycleSegments; i++) { cycleDuration += intervalForSegment(float(i)); }
+    const int cycleSegments = 32;
+    highp float cycleDuration = float(cycleSegments) * (minInterval + maxInterval) * 0.5;
+
+    highp float cycleIndex = floor(TIME / cycleDuration);
+    highp float t = mod(TIME, cycleDuration);
+    highp float segmentStart = 0.0;
+    highp float segmentDuration = minInterval;
+    highp int segmentIndex = 0;
+    for (int i = 0; i < cycleSegments; i++)
+    {
+        highp float duration = intervalForSegment(float(i));
+        if (t < segmentStart + duration)
+        {
+            segmentIndex = i;
+            segmentDuration = duration;
+            break;
+        }
+
+        segmentStart += duration;
+    }
+
+    highp float localTime = t - segmentStart;
+
+    highp int colorAIndex = pickColor(float(segmentIndex), cycleIndex);
+    highp int colorBIndex = pickColor(float(segmentIndex + 1), cycleIndex);
+    if (colorAIndex == colorBIndex)
+    {
+        colorBIndex = (colorBIndex + 1) % 6;
+    }
+
+    highp vec3 colorA = palette(colorAIndex);
+    highp vec3 colorB = palette(colorBIndex);
+
+    // Hold most of the interval, then slowly shift near the end.
+    highp float shiftStart = max(0.0, segmentDuration - transitionSeconds);
+    highp float blend = smoothstep(shiftStart, segmentDuration, localTime);
+    highp vec3 targetColor = mix(colorA, colorB, blend);
+
+    // Subtle noise keeps the result from looking perfectly flat.
+    highp float n = hash(UV * 96.0 + vec2(TIME * 0.13, TIME * 0.21));
+    highp float pulse = 1.0 + (n - 0.5) * 0.06;
+    highp vec3 rgb = clamp(tex.rgb * mix(vec3(1.0), targetColor, colorStrength) * pulse, 0.0, 1.0);
+
+    // Keep alpha stable; only a tiny shimmer.
+    highp float a = tex.a * (1.0 - alphaJitter * 0.5 + n * alphaJitter);
+
+    COLOR = vec4(rgb, a);
+}

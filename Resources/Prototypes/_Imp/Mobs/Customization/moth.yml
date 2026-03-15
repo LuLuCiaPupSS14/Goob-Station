@@ -274,6 +274,38 @@
   - sprite: _Impstation/Mobs/Customization/Moth/eyes.rsi
     state: bigger
 
+- type: marking
+  id: RosieEyesLarge
+  bodyPart: Eyes
+  markingCategory: Head
+  speciesRestriction: [ Moth ]
+  forcedColoring: true
+  coloring:
+    default:
+      type:
+        !type:SimpleColoring
+          color: "#FFFFFF"
+  shader: MothEyesFlicker
+  sprites:
+  - sprite: _Impstation/Mobs/Customization/Moth/eyes.rsi
+    state: bigger
+
+- type: marking
+  id: RosieEyesNormal
+  bodyPart: Eyes
+  markingCategory: Head
+  speciesRestriction: [ Moth ]
+  forcedColoring: true
+  coloring:
+    default:
+      type:
+        !type:SimpleColoring
+          color: "#FFFFFF"
+  shader: MothEyesFlicker
+  sprites:
+  - sprite: _Impstation/Mobs/Customization/Moth/eyes.rsi
+    state: mothperson
+
 # RArm
 
 - type: marking
