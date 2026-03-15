@@ -248,10 +248,7 @@ public abstract partial class SharedSurgerySystem
         if (activeHandEntity != default
             && !HasComp<BodyPartComponent>(activeHandEntity) // Omu
             && !HasComp<OrganComponent>(activeHandEntity) // Omu
-            && ent.Comp.Action == "Insert"
-            && TryComp(activeHandEntity, out ItemComponent? itemComp)
-            && (itemComp.Size.Id == "Tiny"
-            || itemComp.Size.Id == "Small"))
+            && ent.Comp.Action == "Insert")
             _itemSlotsSystem.TryInsert(ent, partComp.ItemInsertionSlot, activeHandEntity, args.User);
         else if (ent.Comp.Action == "Remove")
             _itemSlotsSystem.TryEjectToHands(ent, partComp.ItemInsertionSlot, args.User);
