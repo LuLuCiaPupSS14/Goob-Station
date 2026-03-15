@@ -12,4 +12,4 @@ The only convention i came up with is that all lavaland items must have `Lavalan
 
 Enjoy hell.
 
-TODO: FUCK HTN better make it's own system
+TODO: FUCK HTN better make its own system
