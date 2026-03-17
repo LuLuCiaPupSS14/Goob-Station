@@ -1,0 +1,17 @@
+# SPDX-FileCopyrightText: 2026 Goob-Station
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+- type: constructionGraph
+  id: clothhandcuffs
+  start: start
+  graph:
+    - node: start
+      edges:
+        - to: cuffscloth
+          steps:
+            - material: Cloth
+              amount: 3
+              doAfter: 5
+    - node: cuffscloth
+      entity: ClothCuffs

@@ -58,6 +58,14 @@
   objectType: Item
 
 - type: construction
+  id: clothhandcuffs
+  graph: clothhandcuffs
+  startNode: start
+  targetNode: cuffscloth
+  category: construction-category-tools
+  objectType: Item
+
+- type: construction
   id: makeshiftstunprod
   graph: makeshiftstunprod
   startNode: start
