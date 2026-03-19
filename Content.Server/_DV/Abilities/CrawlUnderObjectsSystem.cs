@@ -15,6 +15,7 @@ using Content.Shared._DV.Abilities;
 using Content.Shared.Maps;
 using Content.Shared.Movement.Systems;
 using Content.Shared.Physics;
+using Content.Shared.Popups;
 using Robust.Server.GameObjects;
 using Robust.Shared.Physics;
 using Robust.Shared.Physics.Systems;
@@ -25,8 +26,10 @@ public sealed partial class CrawlUnderObjectsSystem : SharedCrawlUnderObjectsSys
 {
     [Dependency] private readonly AppearanceSystem _appearance = default!;
     [Dependency] private readonly SharedActionsSystem _actionsSystem = default!;
+    [Dependency] private readonly EntityLookupSystem _lookup = default!;
     [Dependency] private readonly MovementSpeedModifierSystem _movespeed = default!;
     [Dependency] private readonly SharedPhysicsSystem _physics = default!;
+    [Dependency] private readonly SharedPopupSystem _popup = default!;
     [Dependency] private readonly TurfSystem _turf = default!;
 
     public override void Initialize()
@@ -116,6 +119,20 @@ public sealed partial class CrawlUnderObjectsSystem : SharedCrawlUnderObjectsSys
     {
         if (args.Handled)
             return;
+
+        // Block toggling off sneak mode while physically underneath a climbable entity (e.g. a table)
+        if (component.Enabled)
+        {
+            foreach (var ent in _lookup.GetEntitiesInRange<ClimbableComponent>(Transform(uid).Coordinates, 0.4f))
+            {
+                if (ent.Owner == uid)
+                    continue;
+
+                _popup.PopupEntity(Loc.GetString("crawl-under-objects-already-sneaking"), uid, uid, PopupType.SmallCaution);
+                args.Handled = true;
+                return;
+            }
+        }
 
         bool result;
 

@@ -7,3 +7,4 @@
 
 crawl-under-objects-toggle-on = Now sneaking
 crawl-under-objects-toggle-off = Now standing
+crawl-under-objects-already-sneaking = You are currently sneaking under something already
