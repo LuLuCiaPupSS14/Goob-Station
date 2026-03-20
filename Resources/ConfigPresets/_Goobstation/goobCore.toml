@@ -19,7 +19,7 @@ privacy_policy_version = "2025-12-25"
 
 [game]
 soft_max_players = 85
-maxcharacterslots = 25
+maxcharacterslots = 2147483647
 round_end_pvs_overrides = false
 defaultpreset = "CombatDynamic"
 ipintel_enabled = true

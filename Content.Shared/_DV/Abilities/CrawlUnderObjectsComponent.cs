@@ -15,7 +15,7 @@ using Robust.Shared.Serialization;
 
 namespace Content.Shared._DV.Abilities;
 
-[RegisterComponent, NetworkedComponent, AutoGenerateComponentState]
+[RegisterComponent, NetworkedComponent, AutoGenerateComponentState(raiseAfterAutoHandleState: true)]
 public sealed partial class CrawlUnderObjectsComponent : Component
 {
     [DataField]
@@ -24,7 +24,7 @@ public sealed partial class CrawlUnderObjectsComponent : Component
     [DataField]
     public EntProtoId? ActionProto;
 
-    [DataField]
+    [DataField, AutoNetworkedField]
     public bool Enabled = false;
 
     /// <summary>

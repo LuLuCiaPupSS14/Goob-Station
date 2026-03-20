@@ -1,0 +1,22 @@
+<controls:FancyWindow xmlns="https://spacestation14.io"
+        xmlns:controls="using:Content.Client.UserInterface.Controls"
+        Title="{Loc 'mob-switcher-window-title'}"
+        MinSize="480 300"
+        SetSize="480 360">
+    <BoxContainer Orientation="Horizontal" HorizontalExpand="True" VerticalExpand="True" SeparationOverride="6" Margin="6">
+
+        <!-- Left: scrollable mob list -->
+        <ScrollContainer HorizontalExpand="True" VerticalExpand="True" HScrollEnabled="False">
+            <BoxContainer Name="EntryContainer" Orientation="Vertical" SeparationOverride="4" />
+        </ScrollContainer>
+
+        <!-- Right: action buttons -->
+        <BoxContainer Orientation="Vertical" MinWidth="160" SeparationOverride="6" VerticalAlignment="Top">
+            <Button Name="AddCurrentButton"    Text="{Loc 'mob-switcher-add-current'}"    MinHeight="32" />
+            <Button Name="SwitchButton"        Text="{Loc 'mob-switcher-switch'}"         MinHeight="32" />
+            <Button Name="RemoveButton"        Text="{Loc 'mob-switcher-remove'}"         MinHeight="32" />
+            <Button Name="ResetButton"         Text="{Loc 'mob-switcher-reset'}"          MinHeight="32" />
+        </BoxContainer>
+
+    </BoxContainer>
+</controls:FancyWindow>

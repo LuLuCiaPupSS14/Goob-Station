@@ -98,7 +98,10 @@ public sealed partial class ClimbSystem : VirtualController
     [Dependency] private readonly SharedTransformSystem _xformSystem = default!;
 
     private const string ClimbingFixtureName = "climb";
+    // Full mask for the climb sensor so it can detect both tables and low obstacles.
     private const int ClimbingCollisionGroup = (int) (CollisionGroup.TableLayer | CollisionGroup.LowImpassable);
+    // StandingStateSystem owns TableLayer/MidImpassable - only strip LowImpassable from entity fixtures here.
+    private const int ClimbingFixtureStripMask = (int) CollisionGroup.LowImpassable;
 
     private EntityQuery<ClimbableComponent> _climbableQuery;
     private EntityQuery<FixturesComponent> _fixturesQuery;
@@ -412,13 +415,13 @@ public sealed partial class ClimbSystem : VirtualController
         {
             if (climbingComp.DisabledFixtureMasks.ContainsKey(name)
                 || fixture.Hard == false
-                || (fixture.CollisionMask & ClimbingCollisionGroup) == 0)
+                || (fixture.CollisionMask & ClimbingFixtureStripMask) == 0)
             {
                 continue;
             }
 
-            climbingComp.DisabledFixtureMasks.Add(name, fixture.CollisionMask & ClimbingCollisionGroup);
-            _physics.SetCollisionMask(uid, name, fixture, fixture.CollisionMask & ~ClimbingCollisionGroup, fixturesComp);
+            climbingComp.DisabledFixtureMasks.Add(name, fixture.CollisionMask & ClimbingFixtureStripMask);
+            _physics.SetCollisionMask(uid, name, fixture, fixture.CollisionMask & ~ClimbingFixtureStripMask, fixturesComp);
         }
 
         if (!_fixtureSystem.TryCreateFixture(

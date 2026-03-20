@@ -271,5 +271,8 @@ namespace Content.Shared.Input
         public static readonly BoundKeyFunction MappingRemoveDecal = "MappingRemoveDecal";
         public static readonly BoundKeyFunction MappingCancelEraseDecal = "MappingCancelEraseDecal";
         public static readonly BoundKeyFunction MappingOpenContextMenu = "MappingOpenContextMenu";
+
+        // Goobstation - Mob Switcher
+        public static readonly BoundKeyFunction OpenMobSwitcher = "OpenMobSwitcher";
     }
 }

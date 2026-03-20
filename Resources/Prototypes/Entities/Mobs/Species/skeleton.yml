@@ -53,6 +53,8 @@
   abstract: true
   components:
   - type: Carriable # Goobstation
+  - type: GrabIntent # Goobstation
+  - type: Grabbable # Goobstation
   - type: HumanoidAppearance
     species: Skeleton
   - type: Icon

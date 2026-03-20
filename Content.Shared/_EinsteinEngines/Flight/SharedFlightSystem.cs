@@ -176,11 +176,38 @@ public abstract class SharedFlightSystem : EntitySystem
         if (component.On)
             return;
 
-        // Restore normal collision masks
-        if (TryComp(uid, out FixturesComponent? fixtureComponent))
-            foreach (var (key, originalMask) in component.ChangedFixtures)
-                if (fixtureComponent.Fixtures.TryGetValue(key, out var fixture))
-                    _physics.SetCollisionMask(uid, key, fixture, originalMask, fixtureComponent);
+        if (!TryComp(uid, out FixturesComponent? fixtureComponent))
+        {
+            component.ChangedFixtures.Clear();
+            return;
+        }
+
+        // If the entity landed on a climbable surface (table, etc.), restoring MidImpassable
+        // immediately would trap them inside it. Defer those bits to StandingStateSystem.
+        var nearClimbable = _standing.IsOnClimbable(uid);
+        var deferred = nearClimbable ? new List<string>() : null;
+
+        foreach (var (key, originalMask) in component.ChangedFixtures)
+        {
+            if (!fixtureComponent.Fixtures.TryGetValue(key, out var fixture))
+                continue;
+
+            if (nearClimbable && (originalMask & StandingStateSystem.StandingCollisionLayer) != 0)
+            {
+                // Restore everything except MidImpassable — let StandingStateSystem handle it.
+                var partial = (originalMask & ~StandingStateSystem.StandingCollisionLayer)
+                              | (fixture.CollisionMask & StandingStateSystem.StandingCollisionLayer);
+                _physics.SetCollisionMask(uid, key, fixture, partial, fixtureComponent);
+                deferred!.Add(key);
+            }
+            else
+            {
+                _physics.SetCollisionMask(uid, key, fixture, originalMask, fixtureComponent);
+            }
+        }
+
+        if (deferred is { Count: > 0 })
+            _standing.DeferMidImpassableRestore(uid, deferred);
 
         component.ChangedFixtures.Clear();
     }

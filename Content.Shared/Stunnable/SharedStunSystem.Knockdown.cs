@@ -1,4 +1,5 @@
 using Content.Shared.Alert;
+using Content.Shared.Climbing.Components;
 using Content.Shared.Bed.Sleep;
 using Content.Shared.Buckle.Components;
 using Content.Shared.Damage;
@@ -448,6 +449,11 @@ public abstract partial class SharedStunSystem
 
         foreach (var ent in intersecting)
         {
+            // Climbable entities (tables, railings) are designed to be stood on top of,
+            // so they should never block standing up.
+            if (HasComp<ClimbableComponent>(ent))
+                continue;
+
             if (!fixtureQuery.TryGetComponent(ent, out var fixtures))
                 continue;
 
