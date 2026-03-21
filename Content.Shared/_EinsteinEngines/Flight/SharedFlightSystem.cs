@@ -150,6 +150,10 @@ public abstract class SharedFlightSystem : EntitySystem
 
         if (TryComp(uid, out FixturesComponent? fixtureComponent))
         {
+            // If StandingStateSystem was going to restore MidImpassable for some fixtures
+            // (e.g. from a previous landing on a table), reclaim those so we save the
+            // correct original mask. Otherwise repeated fly/land on tables permanently
+            // loses MidImpassable.
             foreach (var (key, fixture) in fixtureComponent.Fixtures)
             {
                 var newMask = (fixture.CollisionMask
@@ -157,15 +161,23 @@ public abstract class SharedFlightSystem : EntitySystem
                     & (int) ~CollisionGroup.MidImpassable)
                     | (int) CollisionGroup.InteractImpassable;
 
-                if (fixture.CollisionMask == newMask)
+                var pendingMid = _standing.ClaimPendingFixtureRestore(uid, key);
+                var savedMask = pendingMid
+                    ? fixture.CollisionMask | StandingStateSystem.StandingCollisionLayer
+                    : fixture.CollisionMask;
+
+                if (fixture.CollisionMask == newMask && !pendingMid)
                     continue;
 
-                component.ChangedFixtures.Add((key, fixture.CollisionMask));
-                _physics.SetCollisionMask(uid,
-                    key,
-                    fixture,
-                    newMask,
-                    manager: fixtureComponent);
+                component.ChangedFixtures.Add((key, savedMask));
+                if (fixture.CollisionMask != newMask)
+                {
+                    _physics.SetCollisionMask(uid,
+                        key,
+                        fixture,
+                        newMask,
+                        manager: fixtureComponent);
+                }
             }
         }
         return;

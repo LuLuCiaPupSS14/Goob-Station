@@ -127,6 +127,23 @@ public sealed class StandingStateSystem : EntitySystem
     }
 
     /// <summary>
+    /// Remove a fixture key from the pending MidImpassable restore list, if present.
+    /// Returns true if the key was pending (meaning MidImpassable should be included
+    /// in the caller's saved original mask).
+    /// </summary>
+    public bool ClaimPendingFixtureRestore(EntityUid uid, string fixtureKey, StandingStateComponent? standing = null)
+    {
+        if (!Resolve(uid, ref standing, false))
+            return false;
+
+        if (!standing.ChangedFixtures.Remove(fixtureKey))
+            return false;
+
+        Dirty(uid, standing);
+        return true;
+    }
+
+    /// <summary>
     /// Register fixture keys so that StandingStateSystem.Update() will restore their MidImpassable
     /// once the entity moves clear of any climbable. Used by systems that strip MidImpassable
     /// (e.g. FlightSystem on landing) to avoid getting stuck inside table surfaces.

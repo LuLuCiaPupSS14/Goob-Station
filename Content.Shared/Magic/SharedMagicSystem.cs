@@ -632,7 +632,10 @@ public abstract class SharedMagicSystem : EntitySystem
 
         ev.Handled = true;
 
-        var direction = _transform.GetMapCoordinates(ev.Target, Transform(ev.Target)).Position - _transform.GetMapCoordinates(ev.Performer, Transform(ev.Performer)).Position;
+        if (!TryComp<TransformComponent>(ev.Target, out var targetXform) || !TryComp<TransformComponent>(ev.Performer, out var performerXform))
+            return;
+
+        var direction = _transform.GetMapCoordinates(ev.Target, targetXform).Position - _transform.GetMapCoordinates(ev.Performer, performerXform).Position;
         var impulseVector = direction * 10000;
 
         _physics.ApplyLinearImpulse(ev.Target, impulseVector);
