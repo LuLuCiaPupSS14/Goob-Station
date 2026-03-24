@@ -38,9 +38,13 @@ public sealed partial class HideUnderFloorAbilitySystem : SharedCrawlUnderFloorS
 
             if (!comp.Enabled)
             {
-                if (comp.OriginalDrawDepth != null && sprite.DrawDepth != comp.OriginalDrawDepth)
-                    _sprite.SetDrawDepth((uid, sprite), (int) comp.OriginalDrawDepth);
-                comp.OriginalDrawDepth = null;
+                // Restore visuals if sneak was just disabled.
+                if (comp.OriginalDrawDepth != null)
+                {
+                    if (sprite.DrawDepth != comp.OriginalDrawDepth)
+                        _sprite.SetDrawDepth((uid, sprite), (int) comp.OriginalDrawDepth);
+                    comp.OriginalDrawDepth = null;
+                }
 
                 if (sprite.ContainerOccluded)
                     _sprite.SetContainerOccluded((uid, sprite), false);
@@ -49,9 +53,13 @@ public sealed partial class HideUnderFloorAbilitySystem : SharedCrawlUnderFloorS
                 continue;
             }
 
+            // Only recalculate visuals when the entity crosses a tile boundary.
             if (_transform.GetGrid(xform.Coordinates) is { } gridUid && TryComp<MapGridComponent>(gridUid, out var grid))
             {
                 var snapPos = _map.TileIndicesFor((gridUid, grid), xform.Coordinates);
+                if (_lastCell.TryGetValue(uid, out var last) && last.Grid == gridUid && last.Tile == snapPos)
+                    continue; // Same tile — no visual change needed.
+
                 _lastCell[uid] = (gridUid, snapPos);
             }
 

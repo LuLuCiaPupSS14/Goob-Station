@@ -88,11 +88,16 @@ public abstract class SharedFlightSystem : EntitySystem
                 component.TimeUntilFlap = component.FlapInterval;
             }
 
-            // We make it 0.7f to compensate by how comparatively lame it is vs sprinting while on stimulants as another species.
+            // Only recalculate stamina drain when the modifier actually changes.
             if (TryComp<StaminaModifierComponent>(uid, out var staminaComp))
-                _staminaSystem.ModifyStaminaDrain(uid,
-                    component.StaminaDrainKey,
-                    component.StaminaDrainRate * staminaComp.Modifier * component.StaminaDrainMultiplier);
+            {
+                var newRate = component.StaminaDrainRate * staminaComp.Modifier * component.StaminaDrainMultiplier;
+                if (!MathHelper.CloseToPercent(newRate, component.LastAppliedDrainRate))
+                {
+                    component.LastAppliedDrainRate = newRate;
+                    _staminaSystem.ModifyStaminaDrain(uid, component.StaminaDrainKey, newRate);
+                }
+            }
         }
     }
 
@@ -113,6 +118,10 @@ public abstract class SharedFlightSystem : EntitySystem
     {
         component.On = active;
         component.TimeUntilFlap = 0f;
+        // Reset the cached drain rate when deactivating so the first Update() after
+        // re-activation forces a ModifyStaminaDrain call with the correct modified rate.
+        if (!active)
+            component.LastAppliedDrainRate = 0f;
         _actionsSystem.SetToggled(component.ToggleActionEntity, component.On);
         RaiseLocalEvent(uid, new FlightEvent(uid, component.On, component.IsAnimated));
         _staminaSystem.ToggleStaminaDrain(uid, component.StaminaDrainRate, active, false, component.StaminaDrainKey, uid);

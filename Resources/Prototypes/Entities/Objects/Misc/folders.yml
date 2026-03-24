@@ -49,9 +49,6 @@
     maxItemSize: Small
     grid:
     - 0,0,4,3
-    whitelist:
-      tags:
-      - Document
   - type: ItemMapper
     mapLayers:
       folder-overlay-paper:
@@ -203,9 +200,6 @@
   - type: Storage
     grid:
     - 0,0,5,3
-    whitelist:
-      tags:
-      - Document
   - type: ItemMapper
     mapLayers:
       clipboard_paper:

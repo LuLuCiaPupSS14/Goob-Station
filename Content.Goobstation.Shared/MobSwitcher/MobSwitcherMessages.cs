@@ -52,6 +52,18 @@ public sealed class MobSwitcherRemoveEvent : EntityEventArgs
 public sealed class MobSwitcherResetEvent : EntityEventArgs;
 
 /// <summary>
+/// Client → Server: cycle to the next mob in the list (wraps around).
+/// </summary>
+[Serializable, NetSerializable]
+public sealed class MobSwitcherCycleNextEvent : EntityEventArgs;
+
+/// <summary>
+/// Client → Server: cycle to the previous mob in the list (wraps around).
+/// </summary>
+[Serializable, NetSerializable]
+public sealed class MobSwitcherCyclePrevEvent : EntityEventArgs;
+
+/// <summary>
 /// Client → Server: request the current list state (e.g. when reopening the window).
 /// </summary>
 [Serializable, NetSerializable]

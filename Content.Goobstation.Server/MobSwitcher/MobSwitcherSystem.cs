@@ -34,6 +34,8 @@ public sealed class MobSwitcherSystem : EntitySystem
         SubscribeNetworkEvent<MobSwitcherRemoveEvent>(OnRemove);
         SubscribeNetworkEvent<MobSwitcherResetEvent>(OnReset);
         SubscribeNetworkEvent<MobSwitcherRequestStateEvent>(OnRequestState);
+        SubscribeNetworkEvent<MobSwitcherCycleNextEvent>(OnCycleNext);
+        SubscribeNetworkEvent<MobSwitcherCyclePrevEvent>(OnCyclePrev);
     }
 
     // ── Handlers ─────────────────────────────────────────────────────────────
@@ -87,13 +89,19 @@ public sealed class MobSwitcherSystem : EntitySystem
             return;
         }
 
-        if (!_minds.TryGetMind(session, out var mindId, out _))
+        if (!_minds.TryGetMind(session, out _, out _))
         {
             Log.Warning($"Player {session.Name} has no mind; cannot switch mob.");
             return;
         }
 
-        _minds.TransferTo(mindId, target, ghostCheckOverride: true, createGhost: false);
+        // Use ControlMob instead of TransferTo directly so that:
+        // 1. IgnoreBindSoulTag is applied – prevents soul-bound mobs from being gibbed when the mind leaves.
+        // 2. MakeSentient is called on the target – restores InputMoverComponent and friends if anything
+        //    stripped them while the mob was idle and unattended.
+        // 3. The same safeguards used by the admin "Control Mob" verb are active, preventing ghost-role
+        //    takeover race conditions that could leave the player's session unbound from the target entity.
+        _minds.ControlMob(session.UserId, target);
         SendState(session);
     }
 
@@ -116,6 +124,50 @@ public sealed class MobSwitcherSystem : EntitySystem
     private void OnRequestState(MobSwitcherRequestStateEvent msg, EntitySessionEventArgs args)
     {
         SendState(args.SenderSession);
+    }
+
+    private void OnCycleNext(MobSwitcherCycleNextEvent msg, EntitySessionEventArgs args)
+    {
+        CycleMob(args.SenderSession, +1);
+    }
+
+    private void OnCyclePrev(MobSwitcherCyclePrevEvent msg, EntitySessionEventArgs args)
+    {
+        CycleMob(args.SenderSession, -1);
+    }
+
+    private void CycleMob(ICommonSession session, int direction)
+    {
+        PruneDeadEntries(session.UserId);
+        var list = GetList(session.UserId);
+
+        if (list.Count < 2)
+            return;
+
+        var current = session.AttachedEntity;
+        var currentIndex = -1;
+
+        for (var i = 0; i < list.Count; i++)
+        {
+            if (list[i].Entity == current)
+            {
+                currentIndex = i;
+                break;
+            }
+        }
+
+        // If the current mob isn't in the list, just go to the first entry
+        var nextIndex = currentIndex == -1
+            ? 0
+            : (currentIndex + direction + list.Count) % list.Count;
+
+        var target = list[nextIndex].Entity;
+
+        if (!_minds.TryGetMind(session, out _, out _))
+            return;
+
+        _minds.ControlMob(session.UserId, target);
+        SendState(session);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

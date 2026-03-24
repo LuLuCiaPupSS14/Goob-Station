@@ -66,6 +66,12 @@ public sealed partial class FlightComponent : Component
     public string StaminaDrainKey = "flight";
 
     /// <summary>
+    ///     Cached last applied drain rate to avoid redundant per-frame ModifyStaminaDrain calls.
+    /// </summary>
+    [ViewVariables]
+    public float LastAppliedDrainRate;
+
+    /// <summary>
     ///     DoAfter delay until the user becomes weightless.
     /// </summary>
     [DataField, AutoNetworkedField]

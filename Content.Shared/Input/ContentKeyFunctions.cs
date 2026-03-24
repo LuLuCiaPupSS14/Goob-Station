@@ -274,5 +274,7 @@ namespace Content.Shared.Input
 
         // Goobstation - Mob Switcher
         public static readonly BoundKeyFunction OpenMobSwitcher = "OpenMobSwitcher";
+        public static readonly BoundKeyFunction CycleMobNext = "CycleMobNext";
+        public static readonly BoundKeyFunction CycleMobPrev = "CycleMobPrev";
     }
 }

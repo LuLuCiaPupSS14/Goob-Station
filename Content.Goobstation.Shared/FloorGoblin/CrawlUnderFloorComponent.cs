@@ -33,6 +33,13 @@ public sealed partial class CrawlUnderFloorComponent : Component
     public bool WasOnSubfloor;
 
     /// <summary>
+    /// Cached tile index — used to avoid repeated tile lookups on every MoveEvent.
+    /// Only reprocesses crawl state when the entity crosses a tile boundary.
+    /// </summary>
+    [ViewVariables]
+    public Vector2i LastTile;
+
+    /// <summary>
     /// What sound to play when opening floor panels
     /// </summary>
     [DataField]

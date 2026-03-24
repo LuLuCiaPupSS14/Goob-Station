@@ -40,6 +40,12 @@ public sealed class MobSwitcherUIController : UIController, IOnStateChanged<Game
         CommandBinds.Builder
             .Bind(ContentKeyFunctions.OpenMobSwitcher,
                 InputCmdHandler.FromDelegate(_ => ToggleWindow()))
+            .Bind(ContentKeyFunctions.CycleMobNext,
+                InputCmdHandler.FromDelegate(_ =>
+                    _net.SendSystemNetworkMessage(new MobSwitcherCycleNextEvent())))
+            .Bind(ContentKeyFunctions.CycleMobPrev,
+                InputCmdHandler.FromDelegate(_ =>
+                    _net.SendSystemNetworkMessage(new MobSwitcherCyclePrevEvent())))
             .Register<MobSwitcherUIController>();
     }
 

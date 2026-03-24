@@ -18,6 +18,7 @@ using Robust.Shared.Map;
 using Robust.Shared.Map.Components;
 using Robust.Shared.Network;
 using Robust.Shared.Physics;
+using Robust.Shared.Physics.Events;
 using Robust.Shared.Physics.Systems;
 using Robust.Shared.Player;
 using Robust.Shared.Random;
@@ -25,10 +26,6 @@ using Content.Shared.Actions;
 using Content.Shared.Mobs.Components;
 using Content.Shared.Doors.Components;
 using Content.Shared.Conveyor;
-using Robust.Shared.Physics.Events;
-using Robust.Shared.Physics;
-using Robust.Shared.Physics.Components;
-using Robust.Shared.Physics.Systems;
 
 namespace Content.Goobstation.Shared.FloorGoblin;
 
@@ -47,9 +44,18 @@ public abstract class SharedCrawlUnderFloorSystem : EntitySystem
     [Dependency] private readonly TileSystem _tile = default!;
     [Dependency] private readonly SharedStealthSystem _stealth = default!;
 
+    private EntityQuery<MobStateComponent> _mobStateQuery;
+    private EntityQuery<AirlockComponent> _airlockQuery;
+    private EntityQuery<ConveyorComponent> _conveyorQuery;
+
     public override void Initialize()
     {
         base.Initialize();
+
+        _mobStateQuery = GetEntityQuery<MobStateComponent>();
+        _airlockQuery = GetEntityQuery<AirlockComponent>();
+        _conveyorQuery = GetEntityQuery<ConveyorComponent>();
+
         SubscribeLocalEvent<CrawlUnderFloorComponent, MapInitEvent>(OnMapInit);
         SubscribeLocalEvent<CrawlUnderFloorComponent, ToggleCrawlingStateEvent>(OnAbilityToggle);
         SubscribeLocalEvent<CrawlUnderFloorComponent, AttemptClimbEvent>(OnAttemptClimb);
@@ -57,7 +63,6 @@ public abstract class SharedCrawlUnderFloorSystem : EntitySystem
         SubscribeLocalEvent<CrawlUnderFloorComponent, MoveEvent>(OnMove);
         SubscribeLocalEvent<CrawlUnderFloorComponent, PreventCollideEvent>(OnPreventCollision);
         SubscribeLocalEvent<CrawlUnderFloorComponent, AttackAttemptEvent>(OnAttemptAttack);
-        SubscribeLocalEvent<AttackAttemptEvent>(OnAnyAttackAttempt);
     }
 
     private void OnMapInit(EntityUid uid, CrawlUnderFloorComponent component, MapInitEvent args)
@@ -95,9 +100,8 @@ public abstract class SharedCrawlUnderFloorSystem : EntitySystem
 
         RefreshCrawlSubfloorState(uid, component, false);
 
-        var onSubfloorNow = IsOnSubfloor(uid);
         if (component.Enabled)
-            SetStealth(uid, !onSubfloorNow);
+            SetStealth(uid, !component.WasOnSubfloor);
         else
             SetStealth(uid, false);
 
@@ -123,10 +127,32 @@ public abstract class SharedCrawlUnderFloorSystem : EntitySystem
 
     private void OnTileChanged(EntityUid gridUid, MapGridComponent grid, ref TileChangedEvent args)
     {
+        // Only check floor goblins that are on the same grid — and only if their tile position
+        // matches the changed tile, avoiding a full entity sweep.
         var query = EntityQueryEnumerator<CrawlUnderFloorComponent, TransformComponent>();
         while (query.MoveNext(out var uid, out var comp, out var xform))
         {
+            if (!comp.Enabled)
+                continue;
+
             if (_transform.GetGrid(xform.Coordinates) is not { } g || g != gridUid)
+                continue;
+
+            // g == gridUid here, so the MapGridComponent is already `grid` from the event args.
+            var entityTile = _map.TileIndicesFor((gridUid, grid), xform.Coordinates);
+
+            // Only process if the entity is standing on one of the changed tiles.
+            var relevant = false;
+            foreach (var change in args.Changes)
+            {
+                if (change.GridIndices == entityTile)
+                {
+                    relevant = true;
+                    break;
+                }
+            }
+
+            if (!relevant)
                 continue;
 
             ProcessCrawlStateChange(uid, comp, true);
@@ -135,21 +161,29 @@ public abstract class SharedCrawlUnderFloorSystem : EntitySystem
 
     private void OnMove(EntityUid uid, CrawlUnderFloorComponent comp, ref MoveEvent args)
     {
-        // Just update the crawl state based on whether we're enabled
-        ProcessCrawlStateChange(uid, comp, comp.Enabled);
+        if (!comp.Enabled)
+            return;
+
+        // Use the position from MoveEvent to avoid an extra Transform() lookup.
+        var coords = args.NewPosition;
+        if (_transform.GetGrid(coords) is not { } gridUid)
+            return;
+        if (!TryComp<MapGridComponent>(gridUid, out var grid))
+            return;
+
+        var currentTile = _map.TileIndicesFor((gridUid, grid), coords);
+        if (comp.LastTile == currentTile)
+            return;
+
+        comp.LastTile = currentTile;
+        ProcessCrawlStateChange(uid, comp, false);
     }
 
 
     private void OnAttemptAttack(EntityUid uid, CrawlUnderFloorComponent comp, AttackAttemptEvent args)
     {
-        if (IsHidden(uid, comp))
+        if (comp.Enabled)
             args.Cancel();
-    }
-
-    private void OnAnyAttackAttempt(AttackAttemptEvent ev)
-    {
-        if (HasComp<CrawlUnderFloorComponent>(ev.Target))
-            ev.Cancel();
     }
 
     private void OnPreventCollision(EntityUid uid, CrawlUnderFloorComponent component, ref PreventCollideEvent args)
@@ -157,21 +191,24 @@ public abstract class SharedCrawlUnderFloorSystem : EntitySystem
         var otherUid = args.OtherEntity;
 
         // Always prevent collision with mobs
-        if (HasComp<MobStateComponent>(otherUid))
+        if (_mobStateQuery.HasComp(otherUid))
         {
             args.Cancelled = true;
             return;
         }
 
+        if (!component.Enabled)
+            return;
+
         // Handle airlocks - allow phasing in stealth mode
-        if (HasComp<AirlockComponent>(otherUid) && component.Enabled)
+        if (_airlockQuery.HasComp(otherUid))
         {
             args.Cancelled = true;
             return;
         }
 
         // Handle conveyor belts - allow phasing in stealth mode
-        if (HasComp<ConveyorComponent>(otherUid) && component.Enabled)
+        if (_conveyorQuery.HasComp(otherUid))
         {
             args.Cancelled = true;
             return;
@@ -278,15 +315,6 @@ public abstract class SharedCrawlUnderFloorSystem : EntitySystem
             PlayDuendeSound(uid, causedByTileChange ? 1f : 0.3f);
     }
 
-    private static int GetOrCacheBase<TKey>(List<(TKey, int)> list, TKey key, int current)
-    {
-        var idx = list.FindIndex(t => EqualityComparer<TKey>.Default.Equals(t.Item1, key));
-        if (idx >= 0)
-            return list[idx].Item2;
-        list.Add((key, current));
-        return current;
-    }
-
     private void PryTileIfUnder(EntityUid uid, CrawlUnderFloorComponent comp)
     {
         if (!TryGetCurrentTile(uid, out var tileRef, out var snapPos))
@@ -303,38 +331,53 @@ public abstract class SharedCrawlUnderFloorSystem : EntitySystem
         _tile.PryTile(snapPos, gridUid);
     }
 
-    private void UpdateCollisionMask(EntityUid uid, bool stealthMode)
+    private void UpdateCollisionMask(EntityUid uid, CrawlUnderFloorComponent component, bool stealthMode)
     {
         if (!TryComp<FixturesComponent>(uid, out var fixtures))
             return;
 
         if (stealthMode)
         {
-            // In stealth mode, set to SmallMob collision to maintain some physics
-            // while still allowing phasing through most objects
+            // Save originals before overwriting, so DisableSneakMode can restore them.
             foreach (var (id, fixture) in fixtures.Fixtures)
             {
-                _physics.SetCollisionMask(uid, id, fixture, (int)CollisionGroup.SmallMobMask, fixtures);
-                _physics.SetCollisionLayer(uid, id, fixture, (int)CollisionGroup.SmallMobLayer, fixtures);
+                // Only save if we haven't already saved this fixture.
+                if (component.ChangedFixtures.FindIndex(t => t.key == id) < 0)
+                    component.ChangedFixtures.Add((id, fixture.CollisionMask));
+                if (component.ChangedFixtureLayers.FindIndex(t => t.key == id) < 0)
+                    component.ChangedFixtureLayers.Add((id, fixture.CollisionLayer));
+
+                _physics.SetCollisionMask(uid, id, fixture, (int) CollisionGroup.SmallMobMask, fixtures);
+                _physics.SetCollisionLayer(uid, id, fixture, (int) CollisionGroup.SmallMobLayer, fixtures);
             }
         }
         else
         {
-            // In normal mode, use standard mob collision
-            foreach (var (id, fixture) in fixtures.Fixtures)
+            // Restore from saved originals instead of hard-coding MobMask/MobLayer.
+            foreach (var (key, originalMask) in component.ChangedFixtures)
             {
-                _physics.SetCollisionMask(uid, id, fixture, (int)CollisionGroup.MobMask, fixtures);
-                _physics.SetCollisionLayer(uid, id, fixture, (int)CollisionGroup.MobLayer, fixtures);
+                if (fixtures.Fixtures.TryGetValue(key, out var fixture))
+                    _physics.SetCollisionMask(uid, key, fixture, originalMask, fixtures);
             }
-        }
 
-        Dirty(uid, fixtures);
+            foreach (var (key, originalLayer) in component.ChangedFixtureLayers)
+            {
+                if (fixtures.Fixtures.TryGetValue(key, out var fixture))
+                    _physics.SetCollisionLayer(uid, key, fixture, originalLayer, fixtures);
+            }
+
+            component.ChangedFixtures.Clear();
+            component.ChangedFixtureLayers.Clear();
+        }
     }
 
     private void SetStealth(EntityUid uid, bool enabled)
     {
+        if (!TryComp<CrawlUnderFloorComponent>(uid, out var comp))
+            return;
+
         // Update collision mask based on stealth state
-        UpdateCollisionMask(uid, enabled);
+        UpdateCollisionMask(uid, comp, enabled);
 
         // Evil hud overlay hiding shitcode that hijacks StealthComponent
         if (enabled)

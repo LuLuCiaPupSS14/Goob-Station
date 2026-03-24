@@ -28,6 +28,13 @@ public sealed partial class CrawlUnderObjectsComponent : Component
     public bool Enabled = false;
 
     /// <summary>
+    ///     If true, sneak mode also strips HighImpassable (doors/airlocks).
+    ///     If false (default), only MidImpassable (tables) is stripped.
+    /// </summary>
+    [DataField]
+    public bool CanCrawlUnderDoors = false;
+
+    /// <summary>
     ///     List of fixtures that had their collision mask changed.
     ///     Required for re-adding the collision mask.
     /// </summary>
@@ -49,7 +56,6 @@ public enum SneakMode : byte
 
 public sealed partial class ToggleCrawlingStateEvent : InstantActionEvent { }
 
-[Serializable, NetSerializable]
 public sealed partial class CrawlingUpdatedEvent(bool enabled = false) : EventArgs
 {
     public readonly bool Enabled = enabled;

@@ -52,17 +52,20 @@ public sealed class StandingStateSystem : EntitySystem
     public const int StandingCollisionLayer = (int) CollisionGroup.MidImpassable;
 
     private EntityQuery<ClimbingComponent> _climbingQuery;
+    private EntityQuery<TransformComponent> _xformQuery;
     private readonly HashSet<Entity<ClimbableComponent>> _climbableBuffer = new();
+    private readonly HashSet<EntityUid> _pendingFixtureRestores = new();
+    private readonly List<EntityUid> _pendingRestoreBuffer = new();
 
     public override void Initialize()
     {
         base.Initialize();
         _climbingQuery = GetEntityQuery<ClimbingComponent>();
+        _xformQuery = GetEntityQuery<TransformComponent>();
         SubscribeLocalEvent<StandingStateComponent, AttemptMobCollideEvent>(OnMobCollide);
         SubscribeLocalEvent<StandingStateComponent, AttemptMobTargetCollideEvent>(OnMobTargetCollide);
         SubscribeLocalEvent<StandingStateComponent, RefreshFrictionModifiersEvent>(OnRefreshFrictionModifiers);
         SubscribeLocalEvent<StandingStateComponent, TileFrictionEvent>(OnTileFriction);
-        // When an entity starts climbing, keep MidImpassable stripped until they leave the climbable.
         SubscribeLocalEvent<StandingStateComponent, StartClimbEvent>(OnStartClimb);
     }
 
@@ -89,32 +92,52 @@ public sealed class StandingStateSystem : EntitySystem
             }
         }
         if (dirty)
+        {
+            _pendingFixtureRestores.Add(ent);
             Dirty(ent, ent.Comp);
+        }
     }
 
     /// <summary>
     /// Each frame: for standing entities with pending fixture restores, restore MidImpassable
-    /// once they are no longer intersecting any climbable.
+    /// once they are no longer near any climbable. The pending set is typically 0-5 entities.
     /// </summary>
     public override void Update(float frameTime)
     {
-        var query = EntityQueryEnumerator<StandingStateComponent, FixturesComponent>();
-        while (query.MoveNext(out var uid, out var standing, out var fixtures))
+        if (_pendingFixtureRestores.Count == 0)
+            return;
+
+        _pendingRestoreBuffer.Clear();
+        _pendingRestoreBuffer.AddRange(_pendingFixtureRestores);
+
+        foreach (var uid in _pendingRestoreBuffer)
         {
-            if (!standing.Standing || standing.ChangedFixtures.Count == 0)
+            if (!TryComp<StandingStateComponent>(uid, out var standing)
+                || !TryComp<FixturesComponent>(uid, out var fixtures))
+            {
+                _pendingFixtureRestores.Remove(uid);
                 continue;
+            }
+
+            if (!standing.Standing || standing.ChangedFixtures.Count == 0)
+            {
+                _pendingFixtureRestores.Remove(uid);
+                continue;
+            }
+
             // Don't restore while climbing — entity must pass through climbable surfaces.
-            // StopClimb sets IsClimbing=false, after which this loop takes over.
             if (_climbingQuery.TryGetComponent(uid, out var climbing) && climbing.IsClimbing)
                 continue;
             if (IsOnClimbable(uid))
                 continue;
+
             foreach (var key in standing.ChangedFixtures)
             {
                 if (fixtures.Fixtures.TryGetValue(key, out var fixture))
                     _physics.SetCollisionMask(uid, key, fixture, fixture.CollisionMask | StandingCollisionLayer, fixtures);
             }
             standing.ChangedFixtures.Clear();
+            _pendingFixtureRestores.Remove(uid);
             Dirty(uid, standing);
         }
     }
@@ -122,7 +145,7 @@ public sealed class StandingStateSystem : EntitySystem
     public bool IsOnClimbable(EntityUid uid, float range = 0.4f)
     {
         _climbableBuffer.Clear();
-        _lookup.GetEntitiesInRange(Transform(uid).Coordinates, range, _climbableBuffer);
+        _lookup.GetEntitiesInRange(_xformQuery.GetComponent(uid).Coordinates, range, _climbableBuffer);
         return _climbableBuffer.Count > 0;
     }
 
@@ -138,6 +161,9 @@ public sealed class StandingStateSystem : EntitySystem
 
         if (!standing.ChangedFixtures.Remove(fixtureKey))
             return false;
+
+        if (standing.ChangedFixtures.Count == 0)
+            _pendingFixtureRestores.Remove(uid);
 
         Dirty(uid, standing);
         return true;
@@ -161,7 +187,10 @@ public sealed class StandingStateSystem : EntitySystem
             dirty = true;
         }
         if (dirty)
+        {
+            _pendingFixtureRestores.Add(uid);
             Dirty(uid, standing);
+        }
     }
 
     private void OnMobTargetCollide(Entity<StandingStateComponent> ent, ref AttemptMobTargetCollideEvent args)
@@ -255,9 +284,13 @@ public sealed class StandingStateSystem : EntitySystem
                 if ((fixture.CollisionMask & StandingCollisionLayer) == 0)
                     continue;
 
-                standingState.ChangedFixtures.Add(key);
+                if (!standingState.ChangedFixtures.Contains(key))
+                    standingState.ChangedFixtures.Add(key);
                 _physics.SetCollisionMask(uid, key, fixture, fixture.CollisionMask & ~StandingCollisionLayer, manager: fixtureComponent);
             }
+
+            if (standingState.ChangedFixtures.Count > 0)
+                _pendingFixtureRestores.Add(uid);
         }
 
         // check if component was just added or streamed to client
@@ -298,25 +331,24 @@ public sealed class StandingStateSystem : EntitySystem
         }
 
         standingState.Standing = true;
-        Dirty(uid, standingState);
         RaiseLocalEvent(uid, new StoodEvent(), false);
 
         _appearance.SetData(uid, RotationVisuals.RotationState, RotationState.Vertical, appearance);
 
-        // If currently on a climbable, don't restore MidImpassable immediately —
-        // Update() will restore it once the entity moves clear.
-        if (!IsOnClimbable(uid))
+        // Immediately restore MidImpassable. The climb path never goes through Stand()
+        // (it uses FinishTransition → StopClimb), so no climbable guard is needed here.
+        if (TryComp(uid, out FixturesComponent? fixtureComponent))
         {
-            if (TryComp(uid, out FixturesComponent? fixtureComponent))
+            foreach (var key in standingState.ChangedFixtures)
             {
-                foreach (var key in standingState.ChangedFixtures)
-                {
-                    if (fixtureComponent.Fixtures.TryGetValue(key, out var fixture))
-                        _physics.SetCollisionMask(uid, key, fixture, fixture.CollisionMask | StandingCollisionLayer, fixtureComponent);
-                }
+                if (fixtureComponent.Fixtures.TryGetValue(key, out var fixture))
+                    _physics.SetCollisionMask(uid, key, fixture, fixture.CollisionMask | StandingCollisionLayer, fixtureComponent);
             }
-            standingState.ChangedFixtures.Clear();
         }
+        standingState.ChangedFixtures.Clear();
+        _pendingFixtureRestores.Remove(uid);
+
+        Dirty(uid, standingState);
 
         return true;
     }

@@ -64,13 +64,13 @@ public sealed partial class KnockedDownComponent : Component
     /// <summary>
     /// Goobstation old WD crawling Datafield, currently used for EE interaction verbs.
     /// </summary>
-    [DataField("helpInterval"), AutoNetworkedField]
+    [DataField("helpInterval")]
     public float HelpInterval = 1f;
 
     /// <summary>
     /// Goobstation old WD crawling Datafield, currently used for EE interaction verbs.
     /// </summary>
-    [ViewVariables, AutoNetworkedField]
+    [ViewVariables]
     public float HelpTimer = 0f;
 
     /// <summary>

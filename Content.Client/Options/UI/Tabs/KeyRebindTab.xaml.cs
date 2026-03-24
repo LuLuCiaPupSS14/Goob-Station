@@ -294,6 +294,8 @@ namespace Content.Client.Options.UI.Tabs
             AddButton(ContentKeyFunctions.OpenActionsMenu);
             AddButton(ContentKeyFunctions.OpenEmotesMenu);
             AddButton(ContentKeyFunctions.OpenMobSwitcher); // Goobstation - Mob Switcher
+            AddButton(ContentKeyFunctions.CycleMobNext); // Goobstation - Mob Switcher
+            AddButton(ContentKeyFunctions.CycleMobPrev); // Goobstation - Mob Switcher
             AddButton(ContentKeyFunctions.ToggleRoundEndSummaryWindow);
             AddButton(ContentKeyFunctions.OpenEntitySpawnWindow);
             AddButton(ContentKeyFunctions.OpenSandboxWindow);

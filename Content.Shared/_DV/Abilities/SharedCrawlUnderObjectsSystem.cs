@@ -21,9 +21,9 @@ namespace Content.Shared._DV.Abilities;
 public abstract class SharedCrawlUnderObjectsSystem : EntitySystem
 {
     [Dependency] protected readonly MovementSpeedModifierSystem _movespeed = default!;
-    [Dependency] private readonly SharedPopupSystem _popup = default!;
-    [Dependency] private readonly SharedPhysicsSystem _physics = default!;
-    [Dependency] private readonly StandingStateSystem _standing = default!;
+    [Dependency] protected readonly SharedPopupSystem _popup = default!;
+    [Dependency] protected readonly SharedPhysicsSystem _physics = default!;
+    [Dependency] protected readonly StandingStateSystem _standing = default!;
 
     public override void Initialize()
     {
@@ -89,30 +89,30 @@ public abstract class SharedCrawlUnderObjectsSystem : EntitySystem
 
         if (component.Enabled)
         {
-            // Ensure sneak masks are applied — if ChangedFixtures is populated, masks should already
-            // be correct, but re-apply anything that drifted.
+            // Sneak is on — ensure the correct layers are stripped.
             foreach (var (key, originalMask) in component.ChangedFixtures)
             {
                 if (!fixtures.Fixtures.TryGetValue(key, out var fixture))
                     continue;
-                var sneakMask = originalMask & (int) ~CollisionGroup.HighImpassable;
-                // Preserve the current MidImpassable state — StandingStateSystem may have
-                // stripped it (e.g. entity downed while sneaking). Don't fight with it.
-                sneakMask = (sneakMask & ~StandingStateSystem.StandingCollisionLayer)
-                            | (fixture.CollisionMask & StandingStateSystem.StandingCollisionLayer);
+                var sneakMask = originalMask & ~StandingStateSystem.StandingCollisionLayer;
+                if (component.CanCrawlUnderDoors)
+                    sneakMask &= (int) ~CollisionGroup.HighImpassable;
                 if (fixture.CollisionMask != sneakMask)
                     _physics.SetCollisionMask(uid, key, fixture, sneakMask, manager: fixtures);
             }
         }
         else
         {
-            // Sneak is off — ensure any fixtures whose original masks are recorded are properly restored.
+            // Sneak is off — restore original masks, but respect current prone state:
+            // don't add MidImpassable back if the entity is currently down (StandingState owns it).
+            var entityDown = _standing.IsDown(uid);
             foreach (var (key, originalMask) in component.ChangedFixtures)
             {
                 if (!fixtures.Fixtures.TryGetValue(key, out var fixture))
                     continue;
-                var restored = (originalMask & ~StandingStateSystem.StandingCollisionLayer)
-                               | (fixture.CollisionMask & StandingStateSystem.StandingCollisionLayer);
+                var restored = entityDown
+                    ? originalMask & ~StandingStateSystem.StandingCollisionLayer
+                    : originalMask;
                 if (fixture.CollisionMask != restored)
                     _physics.SetCollisionMask(uid, key, fixture, restored, fixtures);
             }
@@ -144,17 +144,35 @@ public abstract class SharedCrawlUnderObjectsSystem : EntitySystem
         if (!TryComp(uid, out FixturesComponent? fixtures))
             return true;
 
+        // Resolve StandingState once upfront. Only attempt to claim pending fixture restores
+        // if there are actually any — the common case (entity is standing normally) has none.
+        var standingComp = CompOrNull<StandingStateComponent>(uid);
+        var hasStandingPending = standingComp is { ChangedFixtures.Count: > 0 };
+
         foreach (var (key, fixture) in fixtures.Fixtures)
         {
-            // Only strip HighImpassable — do NOT add InteractImpassable.
-            // Adding InteractImpassable to the mask would cause new contacts with any entity
-            // whose collision layer includes InteractImpassable (e.g. DamageContactsComponent
-            // objects like barbed wire), resulting in unexpected contact damage.
-            var newMask = fixture.CollisionMask & (int) ~CollisionGroup.HighImpassable;
-            if (fixture.CollisionMask == newMask)
+            // Strip MidImpassable so the entity can pass under tables.
+            // Only strip HighImpassable (doors/airlocks) if the component explicitly allows it.
+            var newMask = fixture.CollisionMask & ~StandingStateSystem.StandingCollisionLayer;
+            if (component.CanCrawlUnderDoors)
+                newMask &= (int) ~CollisionGroup.HighImpassable;
+
+            // Build the "true original" mask (before any other system modified it).
+            // If the entity is currently prone, StandingStateSystem may have already stripped
+            // MidImpassable and is holding a pending restore for when they stand up.
+            // Claim that responsibility so Stand() doesn't add MidImpassable back while we
+            // are still sneaking.
+            var originalMask = fixture.CollisionMask;
+            var claimedFromStanding = hasStandingPending && _standing.ClaimPendingFixtureRestore(uid, key, standingComp);
+            if (claimedFromStanding)
+                originalMask |= StandingStateSystem.StandingCollisionLayer; // true original had it
+
+            if (fixture.CollisionMask == newMask && !claimedFromStanding)
                 continue;
-            component.ChangedFixtures.Add((key, fixture.CollisionMask));
-            _physics.SetCollisionMask(uid, key, fixture, newMask, manager: fixtures);
+
+            component.ChangedFixtures.Add((key, originalMask));
+            if (fixture.CollisionMask != newMask)
+                _physics.SetCollisionMask(uid, key, fixture, newMask, manager: fixtures);
         }
         return true;
     }
@@ -172,16 +190,42 @@ public abstract class SharedCrawlUnderObjectsSystem : EntitySystem
         if (!TryComp(uid, out FixturesComponent? fixtures))
             return true;
 
+        var entityDown = _standing.IsDown(uid);
+        List<string>? fixturesToDefer = null;
+
         foreach (var (key, originalMask) in component.ChangedFixtures)
         {
             if (!fixtures.Fixtures.TryGetValue(key, out var fixture))
                 continue;
-            // Preserve whatever MidImpassable state StandingStateSystem currently has.
-            var restored = (originalMask & ~StandingStateSystem.StandingCollisionLayer)
-                           | (fixture.CollisionMask & StandingStateSystem.StandingCollisionLayer);
+
+            int restored;
+            if (entityDown)
+            {
+                // Entity is prone: restore everything except MidImpassable.
+                // StandingStateSystem will handle restoring MidImpassable when they stand up.
+                restored = originalMask & ~StandingStateSystem.StandingCollisionLayer;
+
+                // If the original mask had MidImpassable, hand that restore-on-stand
+                // responsibility back to StandingStateSystem now.
+                if ((originalMask & StandingStateSystem.StandingCollisionLayer) != 0)
+                {
+                    fixturesToDefer ??= new List<string>();
+                    fixturesToDefer.Add(key);
+                }
+            }
+            else
+            {
+                // Entity is standing: fully restore the original mask.
+                restored = originalMask;
+            }
+
             _physics.SetCollisionMask(uid, key, fixture, restored, fixtures);
         }
         component.ChangedFixtures.Clear();
+
+        if (fixturesToDefer?.Count > 0)
+            _standing.DeferMidImpassableRestore(uid, fixturesToDefer);
+
         return true;
     }
 }

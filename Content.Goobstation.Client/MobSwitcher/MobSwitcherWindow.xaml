@@ -11,11 +11,11 @@
         </ScrollContainer>
 
         <!-- Right: action buttons -->
-        <BoxContainer Orientation="Vertical" MinWidth="160" SeparationOverride="6" VerticalAlignment="Top">
-            <Button Name="AddCurrentButton"    Text="{Loc 'mob-switcher-add-current'}"    MinHeight="32" />
-            <Button Name="SwitchButton"        Text="{Loc 'mob-switcher-switch'}"         MinHeight="32" />
-            <Button Name="RemoveButton"        Text="{Loc 'mob-switcher-remove'}"         MinHeight="32" />
-            <Button Name="ResetButton"         Text="{Loc 'mob-switcher-reset'}"          MinHeight="32" />
+        <BoxContainer Orientation="Vertical" MinWidth="160" SeparationOverride="10" VerticalAlignment="Top">
+            <Button Name="AddCurrentButton"    Text="{Loc 'mob-switcher-add-current'}"    MinHeight="40" />
+            <Button Name="SwitchButton"        Text="{Loc 'mob-switcher-switch'}"         MinHeight="40" />
+            <Button Name="RemoveButton"        Text="{Loc 'mob-switcher-remove'}"         MinHeight="40" />
+            <Button Name="ResetButton"         Text="{Loc 'mob-switcher-reset'}"          MinHeight="40" />
         </BoxContainer>
 
     </BoxContainer>
