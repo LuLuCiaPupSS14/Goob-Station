@@ -317,17 +317,12 @@ public abstract class SharedCrawlUnderFloorSystem : EntitySystem
 
     private void PryTileIfUnder(EntityUid uid, CrawlUnderFloorComponent comp)
     {
-        if (!TryGetCurrentTile(uid, out var tileRef, out var snapPos))
+        if (!TryGetCurrentTile(uid, out var tileRef, out var snapPos, out var gridUid))
             return;
         if (tileRef.Tile.IsEmpty || ((ContentTileDefinition) _tileManager[tileRef.Tile.TypeId]).IsSubFloor)
             return;
 
-        var coords = Transform(uid).Coordinates;
-        if (_transform.GetGrid(coords) is not { } gridUid || !TryComp<MapGridComponent>(gridUid, out _))
-            return;
-
         _audio.PlayPvs(comp.PrySound, uid);
-
         _tile.PryTile(snapPos, gridUid);
     }
 
@@ -399,8 +394,6 @@ public abstract class SharedCrawlUnderFloorSystem : EntitySystem
         }
     }
 
-
-
     private void RefreshCrawlSubfloorState(EntityUid uid, CrawlUnderFloorComponent comp, bool causedByTileChange)
     {
         var now = IsOnSubfloor(uid);
@@ -422,16 +415,21 @@ public abstract class SharedCrawlUnderFloorSystem : EntitySystem
     }
 
     private bool TryGetCurrentTile(EntityUid uid, out TileRef tileRef, out Vector2i snapPos)
+        => TryGetCurrentTile(uid, out tileRef, out snapPos, out _);
+
+    private bool TryGetCurrentTile(EntityUid uid, out TileRef tileRef, out Vector2i snapPos, out EntityUid gridUid)
     {
         var transform = Transform(uid);
         tileRef = default;
         snapPos = default;
-        if (_transform.GetGrid(transform.Coordinates) is not { } gridUid)
+        gridUid = default;
+        if (_transform.GetGrid(transform.Coordinates) is not { } gid)
             return false;
-        if (!TryComp<MapGridComponent>(gridUid, out var grid))
+        if (!TryComp<MapGridComponent>(gid, out var grid))
             return false;
-        snapPos = _map.TileIndicesFor((gridUid, grid), transform.Coordinates);
-        tileRef = _map.GetTileRef(gridUid, grid, snapPos);
+        gridUid = gid;
+        snapPos = _map.TileIndicesFor((gid, grid), transform.Coordinates);
+        tileRef = _map.GetTileRef(gid, grid, snapPos);
         return true;
     }
 }

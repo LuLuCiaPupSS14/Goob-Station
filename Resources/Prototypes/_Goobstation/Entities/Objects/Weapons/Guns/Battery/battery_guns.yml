@@ -212,6 +212,62 @@
   - type: Item
     heldPrefix: lethal
   - type: Sprite
+    sprite: _Goobstation/Objects/Weapons/Guns/Battery/erevolver_mkii.rsi
+    layers:
+    - state: base
+      map: ["enum.GunVisualLayers.Base"]
+  - type: ItemMapper
+    sprite: _Goobstation/Objects/Weapons/Guns/Battery/erevolver_mkii.rsi
+    mapLayers:
+      mag-unshaded-4:
+        whitelist:
+          tags:
+          - EnergySpeedloaderLethal
+      mode-disabler:
+        whitelist:
+          tags:
+          - EnergySpeedloaderDisabler
+  - type: Clothing
+    sprite: _Goobstation/Objects/Weapons/Guns/Battery/erevolver_mkii.rsi
+    slots:
+    - Belt
+    - suitStorage
+  - type: Gun
+    soundGunshot:
+      path: /Audio/Weapons/Guns/Gunshots/laser_cannon.ogg
+    soundEmpty:
+      path: /Audio/_DV/Weapons/Guns/Empty/dry_fire.ogg
+  - type: RestrictGunshotsByUserTag # Goobstation
+    doesntContain:
+    - Oni
+    messages:
+    - oni-cannot-shoot-guns-1
+    - oni-cannot-shoot-guns-2
+    - oni-cannot-shoot-guns-3
+  - type: ItemSlots
+    slots:
+      gun_magazine:
+        name: Magazine
+        startingItem: EnergySpeedloaderLethal
+        insertSound: /Audio/Weapons/Guns/MagIn/revolver_magin.ogg
+        ejectSound: /Audio/Weapons/Guns/MagOut/revolver_magout.ogg
+        whitelist:
+          tags:
+            - EnergySpeedloader
+
+- type: entity
+  name: Diplomatic Disagreement
+  parent: [ BaseWeaponCustomCellSmall, BaseCentcommContraband ]
+  id: WeaponEnergyRevolverMkII
+  description: Radio tone beep "We're sorry, your request cannot be completed, perhaps you should consult with out complaints center?" Takes energy speedloaders.
+  components:
+  - type: Tag
+    tags:
+    - Sidearm
+    - DiplomaticDisagreement
+  - type: Item
+    heldPrefix: lethal
+  - type: Sprite
     sprite: _Goobstation/Objects/Weapons/Guns/Battery/erevolver.rsi
     layers:
     - state: base

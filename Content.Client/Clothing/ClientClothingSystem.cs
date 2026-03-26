@@ -81,6 +81,9 @@ public sealed class ClientClothingSystem : ClothingSystem
         {"pocket1", "POCKET1"},
         {"pocket2", "POCKET2"},
         {"suitstorage", "SUITSTORAGE"},
+        {"back2", "BACKPACK"},
+        {"belt2", "BELT"},
+        {"suitstorage2", "SUITSTORAGE"},
     };
 
     [Dependency] private readonly IResourceCache _cache = default!;
@@ -146,8 +149,25 @@ public sealed class ClientClothingSystem : ClothingSystem
         // if that returned nothing, attempt to find generic data
         if (layers == null && !item.ClothingVisuals.TryGetValue(args.Slot, out layers))
         {
+            // Check if this slot is an alias of another (e.g. back2 -> back, belt2 -> belt, suitstorage2 -> suitstorage)
+            var baseSlot = args.Slot switch
+            {
+                "back2" => "back",
+                "belt2" => "belt",
+                "suitstorage2" => "suitstorage",
+                _ => null,
+            };
+
+            if (baseSlot != null)
+            {
+                if (inventory.SpeciesId != null)
+                    item.ClothingVisuals.TryGetValue($"{baseSlot}-{inventory.SpeciesId}", out layers);
+                if (layers == null)
+                    item.ClothingVisuals.TryGetValue(baseSlot, out layers);
+            }
+
             // No generic data either. Attempt to generate defaults from the item's RSI & item-prefixes
-            if (!TryGetDefaultVisuals(uid, item, args.Slot, inventory.SpeciesId, out layers))
+            if (layers == null && !TryGetDefaultVisuals(uid, item, args.Slot, inventory.SpeciesId, out layers))
                 return;
         }
 

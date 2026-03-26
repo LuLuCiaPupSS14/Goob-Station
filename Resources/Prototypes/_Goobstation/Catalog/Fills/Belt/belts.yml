@@ -21,6 +21,60 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 - type: entity
+  parent: ClothingBeltStorageBase
+  id: ClothingBeltHolsterHOP
+  name: HoP's holster
+  description: A holster clipped to a waist belt. A Head of Personnel needs to be ready for anything.
+  components:
+  - type: Sprite
+    sprite: _Goobstation/Clothing/Belt/hop_holster.rsi
+    layers:
+    - state: icon
+    - state: icon-filled
+      visible: false
+      map: ["icon-filled"]
+  - type: Appearance
+  - type: ItemMapper
+    sprite: _Goobstation/Clothing/Belt/hop_holster.rsi
+    containerWhitelist:
+    - item
+    mapLayers:
+      icon-filled:
+        whitelist:
+          tags:
+          - DiplomaticDisagreement
+  - type: Clothing
+    sprite: _Goobstation/Clothing/Belt/hop_holster.rsi
+  - type: Storage
+    grid:
+    - 0,0,3,1
+  # Goobstation
+    whitelist:
+      components:
+        - BallisticAmmoProvider
+        - CartridgeAmmo
+      tags:
+        - EnergySpeedloader
+  - type: ContainerContainer
+    containers:
+      item: !type:ContainerSlot
+      storagebase: !type:Container
+        ents: []
+  - type: ItemSlots
+    slots:
+      item:
+        name: Handgun
+        whitelist:
+          tags:
+          - Sidearm
+  - type: ItemSlotClothingVisuals
+    slotId: item
+    visualsOverride:
+      WeaponEnergyRevolverMkII:
+        belt:
+        - state: equipped-BELT-filled
+
+- type: entity
   parent: ClothingBeltMilitaryWebbingCMO
   suffix: Filled, DO NOT MAP
   id: ClothingBeltMilitaryWebbingCMOFilled

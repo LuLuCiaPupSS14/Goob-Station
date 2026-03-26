@@ -5,8 +5,10 @@
 using Content.Goobstation.Shared.FloorGoblin;
 using Content.Shared._DV.Abilities;
 using Content.Shared._Starlight.VentCrawling;
+using Content.Shared.Maps;
 using Content.Shared.VentCrawler.Tube.Components;
 using Robust.Client.GameObjects;
+using Robust.Shared.Map;
 using Robust.Shared.Map.Components;
 using DrawDepth = Content.Shared.DrawDepth.DrawDepth;
 
@@ -18,6 +20,7 @@ public sealed partial class HideUnderFloorAbilitySystem : SharedCrawlUnderFloorS
     [Dependency] private readonly SpriteSystem _sprite = default!;
     [Dependency] private readonly SharedTransformSystem _transform = default!;
     [Dependency] private readonly SharedMapSystem _map = default!;
+    [Dependency] private readonly ITileDefinitionManager _tileDefs = default!;
 
     private readonly Dictionary<EntityUid, (EntityUid Grid, Vector2i Tile)> _lastCell = new();
 
@@ -61,44 +64,42 @@ public sealed partial class HideUnderFloorAbilitySystem : SharedCrawlUnderFloorS
                     continue; // Same tile — no visual change needed.
 
                 _lastCell[uid] = (gridUid, snapPos);
-            }
 
-            ApplySneakVisuals(uid, comp, sprite);
-        }
-    }
-
-    private void ApplySneakVisuals(EntityUid uid, CrawlUnderFloorComponent comp, SpriteComponent sprite)
-    {
-        var onSubfloor = IsOnSubfloor(uid);
-
-        if (comp.Enabled)
-        {
-            if (comp.OriginalDrawDepth == null)
-                comp.OriginalDrawDepth = sprite.DrawDepth;
-
-            if (onSubfloor)
-            {
-                if (sprite.ContainerOccluded)
-                    _sprite.SetContainerOccluded((uid, sprite), false);
-                if (sprite.DrawDepth != (int) DrawDepth.BelowFloor)
-                    _sprite.SetDrawDepth((uid, sprite), (int) DrawDepth.BelowFloor);
+                // Compute subfloor state here — we already have grid + snapPos,
+                // so avoid IsOnSubfloor() re-doing Transform+GetGrid+TileIndicesFor.
+                var tileRef = _map.GetTileRef(gridUid, grid, snapPos);
+                var onSubfloor = !tileRef.Tile.IsEmpty
+                                 && ((ContentTileDefinition) _tileDefs[tileRef.Tile.TypeId]).IsSubFloor;
+                ApplySneakVisuals(uid, comp, sprite, onSubfloor);
             }
             else
             {
-                if (!sprite.ContainerOccluded)
-                    _sprite.SetContainerOccluded((uid, sprite), true);
-                if (comp.OriginalDrawDepth != null && sprite.DrawDepth != comp.OriginalDrawDepth)
-                    _sprite.SetDrawDepth((uid, sprite), (int) comp.OriginalDrawDepth);
+                ApplySneakVisuals(uid, comp, sprite, false);
             }
+        }
+    }
+
+    /// <summary>
+    /// Only called when comp.Enabled is true (the disabled case is handled inline in Update).
+    /// </summary>
+    private void ApplySneakVisuals(EntityUid uid, CrawlUnderFloorComponent comp, SpriteComponent sprite, bool onSubfloor)
+    {
+        if (comp.OriginalDrawDepth == null)
+            comp.OriginalDrawDepth = sprite.DrawDepth;
+
+        if (onSubfloor)
+        {
+            if (sprite.ContainerOccluded)
+                _sprite.SetContainerOccluded((uid, sprite), false);
+            if (sprite.DrawDepth != (int) DrawDepth.BelowFloor)
+                _sprite.SetDrawDepth((uid, sprite), (int) DrawDepth.BelowFloor);
         }
         else
         {
+            if (!sprite.ContainerOccluded)
+                _sprite.SetContainerOccluded((uid, sprite), true);
             if (comp.OriginalDrawDepth != null && sprite.DrawDepth != comp.OriginalDrawDepth)
                 _sprite.SetDrawDepth((uid, sprite), (int) comp.OriginalDrawDepth);
-            comp.OriginalDrawDepth = null;
-
-            if (sprite.ContainerOccluded)
-                _sprite.SetContainerOccluded((uid, sprite), false);
         }
     }
 

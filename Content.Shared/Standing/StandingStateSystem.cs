@@ -335,18 +335,32 @@ public sealed class StandingStateSystem : EntitySystem
 
         _appearance.SetData(uid, RotationVisuals.RotationState, RotationState.Vertical, appearance);
 
-        // Immediately restore MidImpassable. The climb path never goes through Stand()
-        // (it uses FinishTransition → StopClimb), so no climbable guard is needed here.
+        // Restore MidImpassable — but if the entity is on a climbable surface (e.g. they
+        // were knocked down onto a table), defer the restore to Update() so they don't clip
+        // into the table. This matches how FlightSystem.EnableCollisionMasks handles landing.
         if (TryComp(uid, out FixturesComponent? fixtureComponent))
         {
-            foreach (var key in standingState.ChangedFixtures)
+            if (standingState.ChangedFixtures.Count > 0 && IsOnClimbable(uid))
             {
-                if (fixtureComponent.Fixtures.TryGetValue(key, out var fixture))
-                    _physics.SetCollisionMask(uid, key, fixture, fixture.CollisionMask | StandingCollisionLayer, fixtureComponent);
+                // Keep ChangedFixtures populated; Update() will restore once they move clear.
+                _pendingFixtureRestores.Add(uid);
+            }
+            else
+            {
+                foreach (var key in standingState.ChangedFixtures)
+                {
+                    if (fixtureComponent.Fixtures.TryGetValue(key, out var fixture))
+                        _physics.SetCollisionMask(uid, key, fixture, fixture.CollisionMask | StandingCollisionLayer, fixtureComponent);
+                }
+                standingState.ChangedFixtures.Clear();
+                _pendingFixtureRestores.Remove(uid);
             }
         }
-        standingState.ChangedFixtures.Clear();
-        _pendingFixtureRestores.Remove(uid);
+        else
+        {
+            standingState.ChangedFixtures.Clear();
+            _pendingFixtureRestores.Remove(uid);
+        }
 
         Dirty(uid, standingState);
 
