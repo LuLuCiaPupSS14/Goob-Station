@@ -7,6 +7,7 @@ using Content.Goobstation.Shared.Clothing;
 using Content.Shared.Clothing;
 using Content.Shared.Item;
 using Robust.Shared.Containers;
+using Robust.Shared.Prototypes;
 
 namespace Content.Goobstation.Client.Clothing;
 

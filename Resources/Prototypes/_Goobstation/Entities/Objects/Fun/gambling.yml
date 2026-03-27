@@ -1,0 +1,15 @@
+# SPDX-FileCopyrightText: 2026 Goob-Station
+#
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+- type: entity
+  id: HandheldTicketPrinter
+  parent: BaseItem
+  name: handheld ticket printer
+  description: The only machine where you will(Might) (*MAYBE*) win it big
+  components:
+  - type: Item
+    size: Small
+  - type: Sprite
+    sprite: _Goobstation/Objects/Fun/handheld_ticket_printer.rsi
+    state: icon
